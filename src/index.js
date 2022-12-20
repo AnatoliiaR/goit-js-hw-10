@@ -1,93 +1,76 @@
 import './css/styles.css';
-const debounce = require('lodash.debounce');
-import Notiflix from 'notiflix';
 import { fetchCountries } from './fetchCountries.js';
-let nameCountry = null;
+import { Notify } from 'notiflix/build/notiflix-notify-aio';
+const debounce = require('lodash.debounce');
+let countryToFind = null;
+
 const DEBOUNCE_DELAY = 300;
 
 const refs = {
-    serchField: document.getElementById('search-box'),
-    countryContainer: document.querySelector('.country-list'),
-    countryInfo: document.querySelector('.country-info'),
-}
+  inputEl: document.getElementById('search-box'),
+  countriesList: document.querySelector('.country-list'),
+  countryInfo: document.querySelector('.country-info'),
+};
 
-refs.serchField.addEventListener('input', debounce(onSearch, DEBOUNCE_DELAY));
+refs.inputEl.addEventListener('input', debounce(onInput, DEBOUNCE_DELAY));
 
-function onSearch(e) {
-    e.preventDefault();
-     nameCountry = e.target.value.trim();
-    if (!nameCountry) {
-        refs.serchField.innerHTML = '';
-        refs.serchField.innerHTML = '';
-        return 
-    }
-    fetchCountries(nameCountry).then(renderCountry).catch(err => {
-        Notiflix.Notify.failure(
-          'Oops, there is no country with that name',
-          err
+function onInput(event) {
+  countryToFind = event.target.value.trim();
+  if (!countryToFind) {
+    clearPage();
+    return;
+  }
+  fetchCountries(countryToFind)
+    .then(countriesArray => {
+      if (countriesArray.length > 10) {
+        Notify.info(
+          '"Too many matches found. Please enter a more specific name."'
         );
-      });
-
+        clearPage();
+        return;
+      }
+      if (countriesArray.length === 1) {
+        return renderExtendedCountryInfo(countriesArray[0]);
+      }
+      renderCountriesList(countriesArray);
+    })
+    .catch(error => {
+      //   видати сповіщення про помилку
+      clearPage();
+      Notify.failure('Oops, there is no country with that name');
+    });
 }
 
+function renderExtendedCountryInfo(country) {
+  clearPage();
+  const langKeys = Object.keys(country.languages);
+  const allLanguages = [];
+  for (const key of langKeys) {
+    allLanguages.push(country.languages[key]);
+  }
+  refs.countryInfo.innerHTML = `<h1><img src=${
+    country.flags.svg
+  } alt="flag" width="40">${
+    country.name.official
+  }</h1><ul><li><span>Capital:</span>${
+    country.capital
+  }</li><li><span>Population:</span>${
+    country.population
+  }</li><li><span>Languages:</span>${allLanguages.join(', ')}</li></ul>`;
+}
 
-function renderCountry(countries) {
+function renderCountriesList(countriesArray) {
+  clearPage();
+  const countriesListMarkup = countriesArray
+    .map(country => {
+      return `<li><img src=${country.flags.svg}  alt="flag" width="40" >${country.name.official}</li>`;
+    })
+    .join('');
 
-    if (countries.lenght === 1) {
-        return countries.map(({ flags, name, capital, population, languages }) => {
-            return`
-            <div class="country-list__item">
-                <img class="country-list__flag" src />${flags.svg} alt=${name.official}>
-                <h2>${name.official}</h2>
-            </div><div class="country-info__item">
-                    <p>
-                        <b>Capital: </b>${capital}
-                    </p>
-                </div><div class="country-info__item">
-                    <p>
-                        <b>Population: </b>${population}
-                    </p>
-                </div><div class="country-info__item">
-                    <p>
-                        <b>Languages: </b>${Object.values(languages)}
-                    </p>
-                </div>`;
-        }).join('');
-    }
+  refs.countriesList.innerHTML = countriesListMarkup;
+}
 
-    else {
-        if (countries.lenght <= 10) {
-            return countries.map(({ flags, name }) => {
-        // console.log(flags.svg, name.official);
-        return `<div class="country-list__item">
-              <img class="country-list__flag" src="${flags.svg}" alt="${name.official}">
-              <h2 class="country-list__name">${name.official}</h2>
-          </div>
-          `;
-      })
-      .join('');
-        }
-    }
-
-   
-        if (countries.lengh > 10) {
-             
-      refs.countryInfo.innerHTML = '';
-      refs.countryContainer.innerHTML = '';
-      return Notify.failure('Oops, there is no country with that name');
-        }
-    }
-
-
-
-
-
-
-
-
-
-          
-
-     
-
-    
+function clearPage() {
+  refs.countriesList.innerHTML = '';
+  refs.countryInfo.innerHTML = '';
+}
